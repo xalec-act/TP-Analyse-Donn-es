@@ -9,13 +9,20 @@ if (!file.exists("data/wines.csv")) {
   white_wines$colour <- "white"
   wines_raw <- rbind(red_wines, white_wines)
 
-  # TODO traitement de données
-  wines <- unique(wines_raw)              # Pour l'instant, environ 1500 lignes dupliquées
-
+  # Suppression des doublons
+  wines <- unique(wines_raw)
+  
+  # Sauvegarde
   write.csv(wines, "data/wines.csv", row.names = FALSE)
+  
+  # Pré-traitement des données
+  wines$quality <- as.numeric(wines$quality)
+  wines$colour <- factor(wines$colour)
 
 } else {
 
   wines <- read.csv("data/wines.csv")
+  wines$quality <- as.numeric(wines$quality)
+  wines$colour <- factor(wines$colour)
 
 }
