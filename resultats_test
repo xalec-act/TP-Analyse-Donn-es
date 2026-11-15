@@ -1,0 +1,29 @@
+
+
+ACP + KNN
+1 accuracy  multiclass         0.566
+2 precision macro_weighted     0.550
+3 sens      macro_weighted     0.566
+4 spec      macro_weighted     0.730
+5 f_meas    macro_weighted     0.560
+
+RF
+1 accuracy  multiclass         0.585
+2 precision macro_weighted     0.569
+3 sens      macro_weighted     0.585
+4 spec      macro_weighted     0.737
+5 f_meas    macro_weighted     0.578
+
+ACP + RF
+1 accuracy  multiclass         0.583
+2 precision macro_weighted     0.602
+3 sens      macro_weighted     0.583
+4 spec      macro_weighted     0.733
+5 f_meas    macro_weighted     0.581
+
+XGBOOST
+1 accuracy  multiclass         0.581
+2 precision macro_weighted     0.585
+3 sens      macro_weighted     0.581
+4 spec      macro_weighted     0.743
+5 f_meas    macro_weighted     0.563
