@@ -1,4 +1,9 @@
-
+KNN
+1 accuracy  multiclass         0.564
+2 precision macro_weighted     0.569
+3 sens      macro_weighted     0.564
+4 spec      macro_weighted     0.724
+5 f_meas    macro_weighted     0.577
 
 ACP + KNN
 1 accuracy  multiclass         0.566
