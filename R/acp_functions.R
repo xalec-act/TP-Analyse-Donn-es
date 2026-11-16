@@ -77,13 +77,13 @@ tracer_cercle <- function(rho, etiquettes, positions, titre = NULL) {
   text(positions, labels = etiquettes, cex = 0.9)
 }
 
-reconstruire <- function(acp, q, scores = acp$x) {
-  z_reconstruit <- tcrossprod(
-    scores[, seq_len(q), drop = FALSE],
-    acp$rotation[, seq_len(q), drop = FALSE]
-  )
-  if (!isFALSE(acp$scale)) {
-    z_reconstruit <- sweep(z_reconstruit, 2, acp$scale, "*")
-  }
-  sweep(z_reconstruit, 2, acp$center, "+")
-}
+# reconstruire <- function(acp, q, scores = acp$x) {
+#   z_reconstruit <- tcrossprod(
+#     scores[, seq_len(q), drop = FALSE],
+#     acp$rotation[, seq_len(q), drop = FALSE]
+#   )
+#   if (!isFALSE(acp$scale)) {
+#     z_reconstruit <- sweep(z_reconstruit, 2, acp$scale, "*")
+#   }
+#   sweep(z_reconstruit, 2, acp$center, "+")
+# }
