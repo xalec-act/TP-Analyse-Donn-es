@@ -2,6 +2,7 @@
 ### Fichier pour importer et nettoyer les données
 ###
 
+### Chargement des données ----------------------------------------------------
 if (!file.exists("data/wines.csv")) {
   red_wines <- read.csv("data-raw/winequality-red.csv", sep = ";")
   red_wines$colour <- "red"
@@ -11,6 +12,9 @@ if (!file.exists("data/wines.csv")) {
 
   # Suppression des doublons
   wines <- unique(wines_raw)
+  
+  # Suppression de variable d'identification
+  wines$X <- NULL
   
   # Sauvegarde
   write.csv(wines, "data/wines.csv", row.names = FALSE)

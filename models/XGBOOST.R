@@ -4,13 +4,9 @@
 
 source("data-raw/import_data.R")
 
-## Définir les paquetages
+## Charger les paquetages
 library(tidymodels)
 library(xgboost)
-
-## Ajustement des données
-wines$quality <- as.numeric(wines$quality)
-wines$colour <- factor(wines$colour)
 
 ## Effectuer la séparation du jeu d'entraînement et de test
 set.seed(0)
