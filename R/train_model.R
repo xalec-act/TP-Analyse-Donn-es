@@ -5,12 +5,20 @@
 library(tidymodels)
 library(xgboost)
 library(kknn)
+library(ordered)
+library(rpartScore)
+library(conflicted)
+conflicts_prefer(dplyr::select(), dplyr::filter())
+
+
+source("R/custom_f_meas.R")
 
 train_model <- function(
     data_train,
-    engine = c("kknn", "xgboost"),
+    engine = c("kknn", "xgboost", "rpartScore"),
     normalize = TRUE,
-    model_name = NULL
+    model_name = NULL,
+    selection_metric = NULL
   ) {
   
   engine <- match.arg(engine)
@@ -23,6 +31,9 @@ train_model <- function(
     v = 5,
     strata = quality
   )
+  
+  min_quality <- min(data_train$quality)
+  max_quality <- max(data_train$quality)
   
   ## Créer la recipe
   ##
@@ -42,10 +53,17 @@ train_model <- function(
       step_normalize(all_numeric_predictors())
   }
   
-  model_rec <- model_rec |>
-    step_dummy(all_nominal_predictors())
+  model_metrics <- metric_set(
+    mae,
+    rmse,
+    rsq,
+    custom_f_meas
+  )
   
   if (engine == "kknn") {
+    
+    model_rec <- model_rec |>
+      step_dummy(all_nominal_predictors())
     
     model_spec <- nearest_neighbor(
       mode = "regression",
@@ -57,10 +75,13 @@ train_model <- function(
     
     param_grid <- crossing(
       neighbors = 1:50,
-      weight_func = c("optimal", "triangular")
+      weight_func = c("optimal", "triangular", "rectangular")
     )
     
   } else if (engine == "xgboost") {
+    
+    model_rec <- model_rec |>
+      step_dummy(all_nominal_predictors())
     
     ## Définir le modèle XGBoost
     ##
@@ -96,8 +117,36 @@ train_model <- function(
       loss_reduction(range = c(-5, 1)),
       sample_prop(range = c(0.60, 1.00)),
       mtry(range = c(2L, 12L)),
-      size = 30
+      size = 10
     )
+  } else if (engine == "rpartScore") {
+    
+    model_rec <- model_rec |>
+      step_mutate(
+        quality = ordered(quality, levels = min_quality:max_quality)
+      )
+    
+    model_spec <- decision_tree(
+      engine = "rpartScore",
+      mode = "classification",
+      cost_complexity = tune(),
+      tree_depth = tune(),
+      min_n = tune()
+    ) |>
+      set_engine(
+        "rpartScore",
+        split = "abs",
+        prune = "mc"
+      )
+    
+    param_grid <- grid_space_filling(
+      cost_complexity(c(-5, -1)),
+      tree_depth(c(4, 10)),
+      min_n(c(10, 40)),
+      size = 2
+    )
+    
+    model_metrics <- metric_set(kap, f_meas, accuracy)
   }
   
   ## Créer le workflow
@@ -110,28 +159,19 @@ train_model <- function(
     model_workflow,
     resamples = data_folds,
     grid = param_grid,
-    metrics = metric_set(
-      rmse,
-      mae,
-      rsq
-    ),
+    metrics = model_metrics,
     control = control_grid(
       save_pred = TRUE,
       verbose = TRUE
     )
   )
   
-  ## Enregistrer la performance des configurations testées
-  all_configs <- show_best(
-    model_tuning,
-    metric = "rmse",
-    n = nrow(param_grid)
-  )
-  
   ## Finaliser le workflow
+  selection_metric <- selection_metric %||% 
+    names(attr(model_metrics, "metrics"))[1]
   final_workflow <- finalize_workflow(
     model_workflow,
-    select_best(model_tuning, metric = "rmse")
+    select_best(model_tuning, metric = selection_metric)
   )
   
   ## Prédire sur les données d'entraînement
@@ -139,38 +179,54 @@ train_model <- function(
     final_workflow,
     data = data_train
   )
-  min_quality <- min(data_train$quality)
-  max_quality <- max(data_train$quality)
+
   training_predictions <- augment(training_fit, new_data = data_train) |>
     mutate(
-      quality_class = factor(quality, levels = min_quality:max_quality),
-      .pred_class = factor(round(.pred), levels = min_quality:max_quality)
+      quality_class = factor(quality, levels = min_quality:max_quality)
     ) |>
     relocate(any_of(c("quality", ".pred", ".resid", ".pred_class")))
   
-  ## Calculer la performance de régression et de prédictions
-  training_metrics <- bind_rows(
-    metric_set(rmse, mae, rsq)(
-      training_predictions,
-      truth = quality,
-      estimate = .pred
-    ),
-    suppressWarnings(metric_set(accuracy, precision, sens, spec, f_meas)(
-      training_predictions,
-      truth = quality_class,
-      estimate = .pred_class,
-      estimator = "macro_weighted"
-    ))
-  ) |>
-    mutate(model_name = model_name)
-  
+  if (engine %in% c("kknn", "xgboost")) {
+    
+    # Mesures pour modèles de régression avec prédiction arrondie
+    training_predictions <- training_predictions |>
+      mutate(
+        .pred_class = factor(round(.pred), levels = min_quality:max_quality)
+      )
+    
+    ## Calculer la performance de régression et de prédictions
+    training_metrics <- bind_rows(
+      metric_set(rmse, mae, rsq)(
+        training_predictions,
+        truth = quality,
+        estimate = .pred
+      ),
+      suppressWarnings(metric_set(accuracy, precision, sens, spec, f_meas)(
+        training_predictions,
+        truth = quality_class,
+        estimate = .pred_class,
+        estimator = "macro_weighted"
+      ))
+    ) |>
+      mutate(model_name = model_name)
+    
+  } else {
+    
+    # Mesures pour modèles avec variable ordinale
+    training_metrics <- training_predictions |>
+      model_metrics(
+        truth = quality_class,
+        estimate = .pred_class,
+        estimator = "macro_weighted"
+      ) |>
+      suppressWarnings()
+  }
+
   list(
     model_tuning = model_tuning,
-    all_configs = all_configs,
     final_workflow = final_workflow,
     training_fit = training_fit,
     training_predictions = training_predictions,
     training_metrics = training_metrics
   )
 }
-

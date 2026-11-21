@@ -68,7 +68,7 @@ tracer_cercle <- function(rho, etiquettes, positions, titre = NULL) {
   theta <- seq(0, 2 * pi, length.out = 361)
   plot(
     cos(theta), sin(theta), type = "l", asp = 1, col = "#60747d",
-    xlim = c(-1.4, 1.4), ylim = c(-1.2, 1.2),
+    xlim = c(-1.4, 1.4), ylim = c(-1.4, 1.4),
     xlab = "Corrélation avec CP1", ylab = "Corrélation avec CP2", main = titre
   )
   abline(h = 0, v = 0, col = "#c4d2d6")

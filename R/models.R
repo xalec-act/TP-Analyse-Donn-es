@@ -2,6 +2,9 @@
 source("data-raw/import_data.R")
 source("data-raw/import_acp.R")
 source("R/train_model.R")
+source("R/plot_predictions.R")
+
+library(tidymodels)
 
 ## Création des splits
 set.seed(0)
