@@ -1,0 +1,53 @@
+KNN
+1 KNN    accuracy  multiclass         0.576
+2 KNN    precision macro_weighted     0.583
+3 KNN    sens      macro_weighted     0.576
+4 KNN    spec      macro_weighted     0.719
+5 KNN    f_meas    macro_weighted     0.588
+
+ k  RMSE   MAE    R2
+21 0.710 0.548 0.363
+
+KNN + ACP
+1 KNN avec ACP accuracy  multiclass         0.559
+2 KNN avec ACP precision macro_weighted     0.567
+3 KNN avec ACP sens      macro_weighted     0.559
+4 KNN avec ACP spec      macro_weighted     0.699
+5 KNN avec ACP f_meas    macro_weighted     0.563
+
+ k  RMSE   MAE    R2
+18 0.726 0.559 0.330
+
+RF
+1 RF     accuracy  multiclass         0.584
+2 RF     precision macro_weighted     0.582
+3 RF     sens      macro_weighted     0.584
+4 RF     spec      macro_weighted     0.739
+5 RF     f_meas    macro_weighted     0.599
+
+mtry min_n trees  RMSE   MAE    R2
+   3     2   500 0.676 0.522 0.420
+
+RF + ACP
+1 RF avec ACP accuracy  multiclass         0.561
+2 RF avec ACP precision macro_weighted     0.58
+3 RF avec ACP sens      macro_weighted     0.561
+4 RF avec ACP spec      macro_weighted     0.713
+5 RF avec ACP f_meas    macro_weighted     0.547
+
+mtry min_n trees  RMSE   MAE    R2
+   3     5   500 0.706 0.548 0.365
+
+MNR
+1 Modèle nul accuracy  multiclass         0.451
+2 Modèle nul precision macro_weighted     0.451
+3 Modèle nul sens      macro_weighted     0.451
+4 Modèle nul spec      macro_weighted     0.549
+5 Modèle nul f_meas    macro_weighted     0.622
+
+     RMSE       MAE            R2
+0.8994157 0.6835505 -5.206829e-05
+
+
+
+
