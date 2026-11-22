@@ -6,128 +6,94 @@ source("R/plot_predictions.R")
 
 library(tidymodels)
 
-## Création des splits
+## Création des splits --------------------------------------------------------
 set.seed(0)
-wines_split <- initial_split(
-  wines, prop = 0.80, strata = quality
-)
+white_split <- initial_split(white_wines, prop = 0.8, strata = quality)
+
 set.seed(0)
-red_split <- initial_split(
-  wines |> filter(colour == "red"), prop = 0.8, strata = quality
-)
-set.seed(0)
-white_split <- initial_split(
-  wines |> filter(colour == "white"), prop = 0.8, strata = quality
-)
-set.seed(0)
-wines_acp_split <- initial_split(
-  wines_acp, prop = 0.8, strata = quality
-)
-set.seed(0)
-red_acp_split <- initial_split(
-  wines_acp |> filter(colour == "red"), prop = 0.8, strata = quality
-)
-set.seed(0)
-white_acp_split <- initial_split(
-  wines_acp |> filter(colour == "white"), prop = 0.8, strata = quality
+white_acp_split <- initial_split(white_acp, prop = 0.8, strata = quality)
+
+## Entraînement de modèles ----------------------------------------------------
+
+# KNN avec ACP
+knn_acp <- train_model(white_acp_split, "kknn", model_name = "KNN + ACP")
+
+# KNN sans ACP
+knn <- train_model(white_split, "kknn", model_name = "KNN", normalize = TRUE)
+
+# Random Forest avec ACP
+rf_acp <- train_model(white_acp_split, "ranger", model_name = "RF + ACP")
+
+# Random Forest sans ACP
+rf <- train_model(white_split, "ranger", model_name = "RF")
+
+# Modèle nul
+train_frequent_quality <- training(white_split) |>
+  count(quality) |>
+  slice_max(n) |>
+  pull(quality)
+
+train_quality_levels <- seq(
+  min(training(white_split)$quality),
+  max(training(white_split)$quality)
 )
 
-## KNN avec ACP
-knn_acp <- train_model(
-  training(wines_acp_split),
-  "kknn",
-  normalize = FALSE,
-  model_name = "KNN + ACP"
-)
-knn_acp_red <- train_model(
-  training(red_acp_split),
-  "kknn",
-  normalize = FALSE,
-  model_name = "KNN + ACP (rouge)"
-)
-knn_acp_white <- train_model(
-  training(white_acp_split),
-  "kknn",
-  normalize = FALSE,
-  model_name = "KNN + ACP (blanc)"
+null_train_predictions <- tibble(
+  quality = training(white_split)$quality,
+  .pred = train_frequent_quality,
+  quality_class = factor(training(white_split)$quality, levels = 0:10),
+  .pred_class = factor(train_frequent_quality, levels = 0:10)
 )
 
-## KNN sans ACP
-knn <- train_model(
-  training(wines_split), "kknn", model_name = "KNN"
-)
-knn_red <- train_model(
-  training(red_split), "kknn", model_name = "KNN (rouge)"
-)
-knn_white <- train_model(
-  training(white_split), "kknn", model_name = "KNN (blanc)"
+null_test_predictions <- tibble(
+  quality = testing(white_split)$quality,
+  .pred = train_frequent_quality,
+  quality_class = factor(testing(white_split)$quality, levels = 0:10),
+  .pred_class = factor(train_frequent_quality, levels = 0:10)
 )
 
-## XGBoost
-xgb <- train_model(
-  training(wines_split), "xgboost", model_name = "XGBoost"
-)
-xgb_red <- train_model(
-  training(red_split), "xgboost", model_name = "XGBoost (rouge)"
-)
-xgb_white <- train_model(
-  training(white_split), "xgboost", model_name = "XGBoost (blanc)"
+null <- list(
+  training_performance = null_predictions$train |>
+    metric_set(mae, rmse, rsq)(
+      truth = quality,
+      estimate = .pred
+    ) |>
+    suppressWarnings() |>
+    mutate(model_name = "null"),
+  test_performance = bind_rows(
+    null_test_predictions |>
+      metric_set(mae, rmse, rsq)(
+        truth = quality,
+        estimate = .pred
+      ) |>
+      suppressWarnings(),
+    null_test_predictions |>
+      metric_set(accuracy, f_meas)(
+        truth = quality_class,
+        estimate = .pred_class,
+        estimator = "macro_weighted"
+      ) |>
+      suppressWarnings()
+  ) |>
+    mutate(model_name = "null")
 )
 
-## Comparaison des modèles
-list(
-  knn_acp,
-  knn_acp_red,
-  knn_acp_white,
-  knn,
-  knn_red,
-  knn_white,
-  xgb,
-  xgb_red,
-  xgb_white
-) |>
-  map(\(model) model$training_metrics) |>
+## Comparaison des modèles ----------------------------------------------------
+
+## Performance d'entraînement
+list(knn_acp, knn, rf_acp, rf, null) |>
+  map(\(model) model$training_performance) |>
+  bind_rows() |>
+  select(!.estimator) |>
+  pivot_wider(names_from = .metric, values_from = .estimate)
+
+## Performance de test
+list(knn_acp, knn, rf_acp, rf, null) |>
+  map(\(model) model$test_performance) |>
   bind_rows() |>
   select(!.estimator) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 
 ## Sélection du modèle final --------------------------------------------------
-selected_model <- xgb
-selected_split <- wines_split
-
-final_fit <- last_fit(
-  selected_model$final_workflow,
-  split = selected_split,
-  metrics = metric_set(
-    rmse,
-    mae,
-    rsq
-  )
-)
-
-## Obtenir les prédictions sur les données de test
-min_quality <- min(training(selected_split)$quality)
-max_quality <- max(training(selected_split)$quality)
-test_predictions <- collect_predictions(final_fit) |>
-  mutate(
-    quality_class = factor(quality, levels = min_quality:max_quality),
-    .pred_class = factor(round(.pred), levels = min_quality:max_quality)
-  )
-
-## Mesures du modèle final
-bind_rows(
-  metric_set(rmse, mae, rsq)(
-    test_predictions,
-    truth = quality,
-    estimate = .pred
-  ),
-  suppressWarnings(metric_set(accuracy, precision, sens, spec, f_meas)(
-    test_predictions,
-    truth = quality_class,
-    estimate = .pred_class,
-    estimator = "macro_weighted"
-  ))
-)
-
-plot_raw_preds(test_predictions, "Modèle final XGBoost")
-plot_cm(test_predictions, "Modèle final XGBoost")
+plot_raw_preds(rf$test_predictions, "Modèle final Random Forest")
+plot_cm(rf$test_predictions, "Modèle final Random Forest")

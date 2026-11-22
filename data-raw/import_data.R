@@ -3,30 +3,51 @@
 ###
 
 ### Chargement des données ----------------------------------------------------
-if (!file.exists("data/wines.csv")) {
-  red_wines <- read.csv("data-raw/winequality-red.csv", sep = ";")
-  red_wines$colour <- "red"
-  white_wines <- read.csv("data-raw/winequality-white.csv", sep = ";")
-  white_wines$colour <- "white"
-  wines_raw <- rbind(red_wines, white_wines)
 
+## Vins blancs
+if (!file.exists("data/white_wines.csv")) {
+  
+  white_wines <- read.csv("data-raw/winequality-white.csv", sep = ";")
+  
   # Suppression des doublons
-  wines <- unique(wines_raw)
+  white_wines <- unique(white_wines)
   
   # Suppression de variable d'identification
-  wines$X <- NULL
+  white_wines$X <- NULL
   
   # Sauvegarde
-  write.csv(wines, "data/wines.csv", row.names = FALSE)
+  write.csv(white_wines, "data/white_wines.csv", row.names = FALSE)
   
   # Pré-traitement des données
-  wines$quality <- as.numeric(wines$quality)
-  wines$colour <- factor(wines$colour)
+  white_wines$quality <- as.numeric(white_wines$quality)
+  
+} else {
+  
+  white_wines <- read.csv("data/white_wines.csv")
+  white_wines$quality <- as.numeric(white_wines$quality)
+  
+}
+
+## Vins rouges
+if (!file.exists("data/red_wines.csv")) {
+  
+  red_wines <- read.csv("data-raw/winequality-red.csv", sep = ";")
+
+  # Suppression des doublons
+  red_wines <- unique(red_wines)
+  
+  # Suppression de variable d'identification
+  red_wines$X <- NULL
+  
+  # Sauvegarde
+  write.csv(red_wines, "data/red_wines.csv", row.names = FALSE)
+  
+  # Pré-traitement des données
+  red_wines$quality <- as.numeric(red_wines$quality)
 
 } else {
 
-  wines <- read.csv("data/wines.csv")
-  wines$quality <- as.numeric(wines$quality)
-  wines$colour <- factor(wines$colour)
+  red_wines <- read.csv("data/red_wines.csv")
+  red_wines$quality <- as.numeric(red_wines$quality)
 
 }

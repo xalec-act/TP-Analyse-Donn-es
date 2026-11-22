@@ -5,27 +5,25 @@
 library(tidymodels)
 library(xgboost)
 library(kknn)
+library(ranger)
 library(ordered)
 library(rpartScore)
 library(conflicted)
 conflicts_prefer(dplyr::select(), dplyr::filter())
 
-
-source("R/custom_f_meas.R")
-
 train_model <- function(
-    data_train,
-    engine = c("kknn", "xgboost", "rpartScore"),
-    normalize = TRUE,
+    data_split,
+    engine = c("kknn", "ranger", "xgboost", "rpartScore"),
+    normalize = FALSE,
     model_name = NULL,
     selection_metric = NULL
   ) {
   
   engine <- match.arg(engine)
-  set.seed(0)
+  data_train <- training(data_split)
   
   ## Effectuer les plis de validation croisée, avec k = 5
-  
+  set.seed(0)
   data_folds <- vfold_cv(
     data_train,
     v = 5,
@@ -56,8 +54,7 @@ train_model <- function(
   model_metrics <- metric_set(
     mae,
     rmse,
-    rsq,
-    custom_f_meas
+    rsq
   )
   
   if (engine == "kknn") {
@@ -67,15 +64,35 @@ train_model <- function(
     
     model_spec <- nearest_neighbor(
       mode = "regression",
-      engine = "kknn",
       neighbors = tune(),
       weight_func = tune(),
       dist_power = 2
-    )
+    ) |>
+      set_engine("kknn", scale = FALSE)
     
     param_grid <- crossing(
       neighbors = 1:50,
       weight_func = c("optimal", "triangular", "rectangular")
+    )
+    
+  } else if (engine == "ranger") {
+    
+    model_spec <- rand_forest(
+      mode = "regression",
+      mtry = tune(),
+      min_n = tune(),
+      trees = 500
+    ) |>
+      set_engine(
+        "ranger",
+        importance = "impurity",
+        num.threads = parallel::detectCores()
+      )
+    
+    param_grid <- grid_regular(
+      mtry(range = c(1L, ncol(data_train) - 1L)),
+      min_n(range = c(2L, 30L)),
+      levels = c(mtry = ncol(data_train) - 1L, min_n = 10L)
     )
     
   } else if (engine == "xgboost") {
@@ -83,15 +100,6 @@ train_model <- function(
     model_rec <- model_rec |>
       step_dummy(all_nominal_predictors())
     
-    ## Définir le modèle XGBoost
-    ##
-    ## trees          : nombre d'arbres
-    ## tree_depth     : profondeur maximale des arbres
-    ## learn_rate     : taux d'apprentissage
-    ## min_n          : nombre minimal d'observations dans un noeud
-    ## loss_reduction : réduction minimale de l'erreur requise
-    ## sample_size    : proportion d'observations utilisée par arbre
-    ## mtry           : nombre de prédicteurs considérés par arbre
     model_spec <- boost_tree(
       mode = "regression",
       trees = tune(),
@@ -162,7 +170,8 @@ train_model <- function(
     metrics = model_metrics,
     control = control_grid(
       save_pred = TRUE,
-      verbose = TRUE
+      verbose = TRUE,
+      parallel_over = "resamples"
     )
   )
   
@@ -179,54 +188,72 @@ train_model <- function(
     final_workflow,
     data = data_train
   )
-
   training_predictions <- augment(training_fit, new_data = data_train) |>
-    mutate(
-      quality_class = factor(quality, levels = min_quality:max_quality)
-    ) |>
     relocate(any_of(c("quality", ".pred", ".resid", ".pred_class")))
   
-  if (engine %in% c("kknn", "xgboost")) {
-    
-    # Mesures pour modèles de régression avec prédiction arrondie
-    training_predictions <- training_predictions |>
-      mutate(
-        .pred_class = factor(round(.pred), levels = min_quality:max_quality)
-      )
-    
-    ## Calculer la performance de régression et de prédictions
-    training_metrics <- bind_rows(
-      metric_set(rmse, mae, rsq)(
-        training_predictions,
-        truth = quality,
-        estimate = .pred
-      ),
-      suppressWarnings(metric_set(accuracy, precision, sens, spec, f_meas)(
-        training_predictions,
-        truth = quality_class,
-        estimate = .pred_class,
-        estimator = "macro_weighted"
-      ))
-    ) |>
-      mutate(model_name = model_name)
-    
-  } else {
-    
+  ## Mesurer la performance sur les données d'entraînement --------------------
+  if (engine == "rpartScore") {
+
     # Mesures pour modèles avec variable ordinale
     training_metrics <- training_predictions |>
+      mutate(
+        quality_class = factor(quality, levels = min_quality:max_quality)
+      ) |>
       model_metrics(
         truth = quality_class,
         estimate = .pred_class,
         estimator = "macro_weighted"
       ) |>
-      suppressWarnings()
+      mutate(model_name = model_name)
+
+  } else {
+    
+    training_performance <- model_metrics(
+        training_predictions,
+        truth = quality,
+        estimate = .pred
+      ) |>
+      mutate(model_name = model_name)
   }
+  
+  ## Mesurer la performance sur les données de test ---------------------------
+  final_fit <- last_fit(
+    final_workflow,
+    split = data_split,
+    metrics = model_metrics
+  )
+  ## Obtenir les prédictions sur les données de test
+  min_quality <- min(data_train$quality)
+  max_quality <- max(data_train$quality)
+  test_predictions <- collect_predictions(final_fit) |>
+    mutate(
+      quality_class = factor(quality, levels = min_quality:max_quality),
+      .pred_class = factor(round(.pred), levels = min_quality:max_quality)
+    )
+  
+  ## Performance du modèle final
+  test_performance <- bind_rows(
+    model_metrics(
+      test_predictions,
+      truth = quality,
+      estimate = .pred
+    ),
+    suppressWarnings(metric_set(accuracy, f_meas)(
+      test_predictions,
+      truth = quality_class,
+      estimate = .pred_class,
+      estimator = "macro_weighted"
+    ))
+  ) |>
+    mutate(model_name = model_name)
 
   list(
     model_tuning = model_tuning,
     final_workflow = final_workflow,
     training_fit = training_fit,
     training_predictions = training_predictions,
-    training_metrics = training_metrics
+    training_performance = training_performance,
+    test_predictions = test_predictions,
+    test_performance = test_performance
   )
 }

@@ -1,10 +1,4 @@
 
-# choisir_q <- function(valeurs, seuil = 0.95) {
-#   cumul <- cumsum(valeurs) / sum(valeurs)
-#   # Tolérance pour les arrondis, notamment quand le cumul devrait valoir 1.
-#   which(cumul >= seuil - 10 * .Machine$double.eps)[1]
-# }
-
 tracer_variance <- function(valeurs, titre) {
   ancien_par <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
   on.exit(par(ancien_par))
@@ -76,14 +70,3 @@ tracer_cercle <- function(rho, etiquettes, positions, titre = NULL) {
   segments(rho[, 1], rho[, 2], positions[, 1], positions[, 2], col = "#aab7bb")
   text(positions, labels = etiquettes, cex = 0.9)
 }
-
-# reconstruire <- function(acp, q, scores = acp$x) {
-#   z_reconstruit <- tcrossprod(
-#     scores[, seq_len(q), drop = FALSE],
-#     acp$rotation[, seq_len(q), drop = FALSE]
-#   )
-#   if (!isFALSE(acp$scale)) {
-#     z_reconstruit <- sweep(z_reconstruit, 2, acp$scale, "*")
-#   }
-#   sweep(z_reconstruit, 2, acp$center, "+")
-# }
