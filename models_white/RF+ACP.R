@@ -1,5 +1,5 @@
 ###
-### Modèle des forêts aléatoires sur les scores de l'ACP des vins blancs
+### Modèle des forêts aléatoires avec ACP sur les vins blancs
 ###
 
 source("data-raw/acp_white.R")
@@ -7,26 +7,10 @@ source("data-raw/acp_white.R")
 library(tidymodels)
 library(ranger)
 library(dplyr)
+library(ggplot2)
 
-set.seed(123)
-
-scores_white_wines$quality <- as.numeric(
-    scores_white_wines$quality
-)
-
-split_wines_acp <- initial_split(
-    scores_white_wines,
-    prop = 0.80,
-    strata = quality
-)
-
-wines_acp_train <- training(
-    split_wines_acp
-)
-
-wines_acp_test <- testing(
-    split_wines_acp
-)
+wines_acp_train <- scores_train
+wines_acp_test <- scores_test
 
 folds_wines_acp <- vfold_cv(
     wines_acp_train,
@@ -38,9 +22,7 @@ recette_rf_acp <- recipe(
     quality ~ .,
     data = wines_acp_train
 ) %>%
-    step_zv(
-        all_predictors()
-    )
+    step_zv(all_predictors())
 
 modele_rf_acp <- rand_forest(
     mtry = tune(),
@@ -49,22 +31,15 @@ modele_rf_acp <- rand_forest(
 ) %>%
     set_engine(
         "ranger",
-        importance = "impurity",
         num.threads = parallel::detectCores()
     ) %>%
     set_mode("regression")
 
 workflow_rf_acp <- workflow() %>%
-    add_recipe(
-        recette_rf_acp
-    ) %>%
-    add_model(
-        modele_rf_acp
-    )
+    add_recipe(recette_rf_acp) %>%
+    add_model(modele_rf_acp)
 
-nombre_composantes <- ncol(
-    wines_acp_train
-) - 1
+nombre_composantes <- ncol(wines_acp_train) - 1
 
 grille_rf_acp <- grid_regular(
     mtry(
@@ -74,10 +49,7 @@ grille_rf_acp <- grid_regular(
         )
     ),
     min_n(
-        range = c(
-            2L,
-            30L
-        )
+        range = c(2L, 30L)
     ),
     levels = c(
         mtry = nombre_composantes,
@@ -89,21 +61,14 @@ resultats_cv_rf_acp <- tune_grid(
     workflow_rf_acp,
     resamples = folds_wines_acp,
     grid = grille_rf_acp,
-    metrics = metric_set(
-        mae,
-        rmse,
-        rsq
-    ),
+    metrics = metric_set(mae),
     control = control_grid(
-        save_pred = TRUE,
         parallel_over = "resamples"
     )
 )
 
 meilleurs_parametres_rf_acp <- resultats_cv_rf_acp %>%
-    select_best(
-        metric = "mae"
-    )
+    select_best(metric = "mae")
 
 workflow_rf_acp_final <- workflow_rf_acp %>%
     finalize_workflow(
@@ -115,16 +80,17 @@ modele_rf_acp_final <- fit(
     data = wines_acp_train
 )
 
-predictions_rf_acp <- predict(
+predictions_rf_acp_train <- predict(
     modele_rf_acp_final,
-    new_data = wines_acp_test
+    new_data = wines_acp_train
 ) %>%
     bind_cols(
-        wines_acp_test %>%
+        wines_acp_train %>%
             select(quality)
     )
 
-metriques_regression_rf_acp <- predictions_rf_acp %>%
+metriques_regression_rf_acp_train <-
+    predictions_rf_acp_train %>%
     summarise(
         mtry = meilleurs_parametres_rf_acp$mtry,
         min_n = meilleurs_parametres_rf_acp$min_n,
@@ -143,21 +109,55 @@ metriques_regression_rf_acp <- predictions_rf_acp %>%
         )
     )
 
-quality_min <- min(
-    scores_white_wines$quality,
-    na.rm = TRUE
+predictions_rf_acp <- predict(
+    modele_rf_acp_final,
+    new_data = wines_acp_test
+) %>%
+    bind_cols(
+        wines_acp_test %>%
+            select(quality)
+    )
+
+metriques_regression_rf_acp <-
+    predictions_rf_acp %>%
+    summarise(
+        mtry = meilleurs_parametres_rf_acp$mtry,
+        min_n = meilleurs_parametres_rf_acp$min_n,
+        trees = 500,
+        RMSE = rmse_vec(
+            truth = quality,
+            estimate = .pred
+        ),
+        MAE = mae_vec(
+            truth = quality,
+            estimate = .pred
+        ),
+        R2 = rsq_vec(
+            truth = quality,
+            estimate = .pred
+        )
+    )
+
+quality_min <- min(c(min(
+    scores_test$quality,
+    na.rm = TRUE),min(
+        scores_train$quality,
+        na.rm = TRUE))
 )
 
-quality_max <- max(
-    scores_white_wines$quality,
-    na.rm = TRUE
+quality_max <- max(c(max(
+    scores_test$quality,
+    na.rm = TRUE),max(
+        scores_train$quality,
+        na.rm = TRUE))
 )
 
 quality_levels <- as.character(
     quality_min:quality_max
 )
 
-predictions_classes_rf_acp <- predictions_rf_acp %>%
+predictions_classes_rf_acp <-
+    predictions_rf_acp %>%
     mutate(
         predicted_quality = round(.pred),
         predicted_quality = pmax(
@@ -183,82 +183,94 @@ matrice_confusion_rf_acp <- conf_mat(
     estimate = predicted_quality
 )
 
-rf_acp_class_metrics <- bind_rows(
-    accuracy(
-        predictions_classes_rf_acp,
-        truth = quality_class,
-        estimate = predicted_quality
-    ),
-    precision(
-        predictions_classes_rf_acp,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    sens(
-        predictions_classes_rf_acp,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    spec(
-        predictions_classes_rf_acp,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    f_meas(
-        predictions_classes_rf_acp,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    )
-) %>%
-    mutate(
-        modele = "RF avec ACP",
-        .estimate = round(
-            .estimate,
-            3
-        )
-    ) %>%
-    select(
-        modele,
-        .metric,
-        .estimator,
-        .estimate
+graphique_confusion_rf_acp <- autoplot(
+    matrice_confusion_rf_acp,
+    type = "heatmap"
+) +
+    scale_fill_gradient(
+        low = "white",
+        high = "coral1"
+    ) +
+    labs(
+        x = "Qualité prédite",
+        y = "Qualité réelle",
+        fill = "Nombre"
+    ) +
+    theme_minimal() +
+    theme(
+        panel.grid = element_blank()
     )
 
-importance_composantes_rf <- extract_fit_parsnip(
-    modele_rf_acp_final
-)$fit$variable.importance %>%
-    tibble::enframe(
-        name = "composante",
-        value = "importance"
-    ) %>%
-    arrange(
-        desc(importance)
+graphique_predictions_rf_acp <- ggplot(
+    predictions_rf_acp,
+    aes(
+        x = quality,
+        y = .pred
+    )
+) +
+    geom_tile(
+        data = tidyr::expand_grid(
+            quality = quality_min:quality_max,
+            predicted_class = quality_min:quality_max
+        ),
+        aes(
+            x = quality,
+            y = predicted_class,
+            fill = quality == predicted_class
+        ),
+        width = 1,
+        height = 1,
+        color = "white",
+        linewidth = 0.8,
+        inherit.aes = FALSE
+    ) +
+    scale_fill_manual(
+        values = c(
+            "FALSE" = "white",
+            "TRUE" = "coral1"
+        ),
+        guide = "none"
+    ) +
+    geom_jitter(
+        width = 0.15,
+        height = 0,
+        shape = 21,
+        fill = NA,
+        color = "black",
+        stroke = 0.8,
+        alpha = 0.75,
+        size = 0.5
+    ) +
+    scale_x_continuous(
+        breaks = quality_min:quality_max,
+        limits = c(
+            quality_min - 0.5,
+            quality_max + 0.5
+        ),
+        expand = c(0, 0)
+    ) +
+    scale_y_continuous(
+        breaks = quality_min:quality_max,
+        limits = c(
+            quality_min - 0.5,
+            quality_max + 0.5
+        ),
+        expand = c(0, 0)
+    ) +
+    coord_fixed() +
+    labs(
+        x = "Qualité réelle",
+        y = "Qualité prédite"
+    ) +
+    theme_minimal() +
+    theme(
+        panel.grid = element_blank()
     )
 
-resultats_rf_acp <- collect_metrics(
-    resultats_cv_rf_acp
-) %>%
-    filter(
-        .metric == "mae"
-    ) %>%
-    arrange(mean)
-
-meilleurs_parametres_rf_acp
-
-resultats_rf_acp
+metriques_regression_rf_acp_train
 
 metriques_regression_rf_acp
 
-matrice_confusion_rf_acp
+graphique_confusion_rf_acp
 
-rf_acp_class_metrics
-
-importance_composantes_rf
+graphique_predictions_rf_acp

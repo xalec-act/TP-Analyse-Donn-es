@@ -7,20 +7,10 @@ source("data-raw/import_data_white.R")
 library(tidymodels)
 library(ranger)
 library(dplyr)
-library(tibble)
+library(ggplot2)
 
-set.seed(0)
-
-white_wines$quality <- as.numeric(white_wines$quality)
-
-split_wines <- initial_split(
-    white_wines,
-    prop = 0.80,
-    strata = quality
-)
-
-wines_train <- training(split_wines)
-wines_test  <- testing(split_wines)
+wines_train <- white_wines_train
+wines_test <- white_wines_test
 
 folds_wines <- vfold_cv(
     wines_train,
@@ -41,7 +31,6 @@ modele_rf <- rand_forest(
 ) %>%
     set_engine(
         "ranger",
-        importance = "impurity",
         num.threads = parallel::detectCores()
     ) %>%
     set_mode("regression")
@@ -72,9 +61,8 @@ resultats_cv_rf <- tune_grid(
     workflow_rf,
     resamples = folds_wines,
     grid = grille_rf,
-    metrics = metric_set(mae, rmse, rsq),
+    metrics = metric_set(mae),
     control = control_grid(
-        save_pred = TRUE,
         parallel_over = "resamples"
     )
 )
@@ -89,6 +77,34 @@ modele_rf_final <- fit(
     workflow_rf_final,
     data = wines_train
 )
+
+predictions_rf_train <- predict(
+    modele_rf_final,
+    new_data = wines_train
+) %>%
+    bind_cols(
+        wines_train %>%
+            select(quality)
+    )
+
+metriques_regression_rf_train <- predictions_rf_train %>%
+    summarise(
+        mtry = meilleurs_parametres_rf$mtry,
+        min_n = meilleurs_parametres_rf$min_n,
+        trees = 500,
+        RMSE = rmse_vec(
+            truth = quality,
+            estimate = .pred
+        ),
+        MAE = mae_vec(
+            truth = quality,
+            estimate = .pred
+        ),
+        R2 = rsq_vec(
+            truth = quality,
+            estimate = .pred
+        )
+    )
 
 predictions_rf <- predict(
     modele_rf_final,
@@ -127,7 +143,10 @@ predictions_classes_rf <- predictions_rf %>%
         predicted_quality = round(.pred),
         predicted_quality = pmax(
             quality_min,
-            pmin(quality_max, predicted_quality)
+            pmin(
+                quality_max,
+                predicted_quality
+            )
         ),
         quality_class = factor(
             as.character(quality),
@@ -145,68 +164,94 @@ matrice_confusion_rf <- conf_mat(
     estimate = predicted_quality
 )
 
-rf_class_metrics <- bind_rows(
-    accuracy(
-        predictions_classes_rf,
-        truth = quality_class,
-        estimate = predicted_quality
-    ),
-    precision(
-        predictions_classes_rf,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    sens(
-        predictions_classes_rf,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    spec(
-        predictions_classes_rf,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    ),
-    f_meas(
-        predictions_classes_rf,
-        truth = quality_class,
-        estimate = predicted_quality,
-        estimator = "macro_weighted",
-        na_rm = TRUE
-    )
-) %>%
-    mutate(
-        modele = "RF",
-        .estimate = round(.estimate, 3)
-    ) %>%
-    select(
-        modele,
-        .metric,
-        .estimator,
-        .estimate
+graphique_confusion_rf <- autoplot(
+    matrice_confusion_rf,
+    type = "heatmap"
+) +
+    scale_fill_gradient(
+        low = "white",
+        high = "coral1"
+    ) +
+    labs(
+        x = "Qualité prédite",
+        y = "Qualité réelle",
+        fill = "Nombre"
+    ) +
+    theme_minimal() +
+    theme(
+        panel.grid = element_blank()
     )
 
-importance_variables_rf <- extract_fit_parsnip(
-    modele_rf_final
-)$fit$variable.importance %>%
-    enframe(
-        name = "variable",
-        value = "importance"
-    ) %>%
-    arrange(desc(importance))
+graphique_predictions_rf <- ggplot(
+    predictions_rf,
+    aes(
+        x = quality,
+        y = .pred
+    )
+) +
+    geom_tile(
+        data = tidyr::expand_grid(
+            quality = quality_min:quality_max,
+            predicted_class = quality_min:quality_max
+        ),
+        aes(
+            x = quality,
+            y = predicted_class,
+            fill = quality == predicted_class
+        ),
+        width = 1,
+        height = 1,
+        color = "white",
+        linewidth = 0.8,
+        inherit.aes = FALSE
+    ) +
+    scale_fill_manual(
+        values = c(
+            "FALSE" = "white",
+            "TRUE" = "coral1"
+        ),
+        guide = "none"
+    ) +
+    geom_jitter(
+        width = 0.15,
+        height = 0,
+        shape = 21,
+        fill = NA,
+        color = "black",
+        stroke = 0.8,
+        alpha = 0.75,
+        size = 0.5
+    ) +
+    scale_x_continuous(
+        breaks = quality_min:quality_max,
+        limits = c(
+            quality_min - 0.5,
+            quality_max + 0.5
+        ),
+        expand = c(0, 0)
+    ) +
+    scale_y_continuous(
+        breaks = quality_min:quality_max,
+        limits = c(
+            quality_min - 0.5,
+            quality_max + 0.5
+        ),
+        expand = c(0, 0)
+    ) +
+    coord_fixed() +
+    labs(
+        x = "Qualité réelle",
+        y = "Qualité prédite"
+    ) +
+    theme_minimal() +
+    theme(
+        panel.grid = element_blank()
+    )
 
-meilleurs_parametres_rf
+metriques_regression_rf_train
 
 metriques_regression_rf
 
-matrice_confusion_rf
+graphique_confusion_rf
 
-rf_class_metrics
-
-importance_variables_rf
-
+graphique_predictions_rf
