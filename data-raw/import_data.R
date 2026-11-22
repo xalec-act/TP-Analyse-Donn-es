@@ -5,7 +5,7 @@
 ### Chargement des données ----------------------------------------------------
 
 ## Vins blancs
-if (!file.exists("data/white_wines.csv")) {
+if (!all(file.exists("data/white_train.csv", "data/white_test.csv"))) {
   
   white_wines <- read.csv("data-raw/winequality-white.csv", sep = ";")
   
@@ -15,39 +15,22 @@ if (!file.exists("data/white_wines.csv")) {
   # Suppression de variable d'identification
   white_wines$X <- NULL
   
-  # Sauvegarde
-  write.csv(white_wines, "data/white_wines.csv", row.names = FALSE)
-  
   # Pré-traitement des données
   white_wines$quality <- as.numeric(white_wines$quality)
   
-} else {
-  
-  white_wines <- read.csv("data/white_wines.csv")
-  white_wines$quality <- as.numeric(white_wines$quality)
-  
-}
-
-## Vins rouges
-if (!file.exists("data/red_wines.csv")) {
-  
-  red_wines <- read.csv("data-raw/winequality-red.csv", sep = ";")
-
-  # Suppression des doublons
-  red_wines <- unique(red_wines)
-  
-  # Suppression de variable d'identification
-  red_wines$X <- NULL
+  set.seed(0)
+  white_split <- initial_split(white_wines, prop = 0.8, strata = quality)
+  white_train <- training(white_split)
+  white_test <- testing(white_split)
   
   # Sauvegarde
-  write.csv(red_wines, "data/red_wines.csv", row.names = FALSE)
+  write.csv(white_train, "data/white_train.csv", row.names = FALSE)
+  write.csv(white_test, "data/white_test.csv", row.names = FALSE)
   
-  # Pré-traitement des données
-  red_wines$quality <- as.numeric(red_wines$quality)
-
 } else {
-
-  red_wines <- read.csv("data/red_wines.csv")
-  red_wines$quality <- as.numeric(red_wines$quality)
-
+  
+  white_train <- read.csv("data/white_train.csv")
+  white_test <- read.csv("data/white_test.csv")
+  white_train$quality <- as.numeric(white_train$quality)
+  white_test$quality <- as.numeric(white_test$quality)
 }

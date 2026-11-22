@@ -11,8 +11,11 @@ library(rpartScore)
 library(conflicted)
 conflicts_prefer(dplyr::select(), dplyr::filter())
 
+source("R/calculate_metrics.R")
+
 train_model <- function(
-    data_split,
+    data_train,
+    data_test,
     engine = c("kknn", "ranger", "xgboost", "rpartScore"),
     normalize = FALSE,
     model_name = NULL,
@@ -20,7 +23,6 @@ train_model <- function(
   ) {
   
   engine <- match.arg(engine)
-  data_train <- training(data_split)
   
   ## Effectuer les plis de validation croisée, avec k = 5
   set.seed(0)
@@ -29,9 +31,6 @@ train_model <- function(
     v = 5,
     strata = quality
   )
-  
-  min_quality <- min(data_train$quality)
-  max_quality <- max(data_train$quality)
   
   ## Créer la recipe
   ##
@@ -129,6 +128,9 @@ train_model <- function(
     )
   } else if (engine == "rpartScore") {
     
+    min_quality <- min(data_train$quality)
+    max_quality <- max(data_train$quality)
+    
     model_rec <- model_rec |>
       step_mutate(
         quality = ordered(quality, levels = min_quality:max_quality)
@@ -184,18 +186,14 @@ train_model <- function(
   )
   
   ## Prédire sur les données d'entraînement
-  training_fit <- fit(
-    final_workflow,
-    data = data_train
-  )
-  training_predictions <- augment(training_fit, new_data = data_train) |>
-    relocate(any_of(c("quality", ".pred", ".resid", ".pred_class")))
+  training_fit <- fit(final_workflow, data = data_train)
+  training_predictions <- augment(training_fit, new_data = data_train)
   
   ## Mesurer la performance sur les données d'entraînement --------------------
   if (engine == "rpartScore") {
 
     # Mesures pour modèles avec variable ordinale
-    training_metrics <- training_predictions |>
+    training_performance <- training_predictions |>
       mutate(
         quality_class = factor(quality, levels = min_quality:max_quality)
       ) |>
@@ -207,45 +205,16 @@ train_model <- function(
       mutate(model_name = model_name)
 
   } else {
+  
+    training_performance <- calculate_metrics(training_predictions, model_name)
     
-    training_performance <- model_metrics(
-        training_predictions,
-        truth = quality,
-        estimate = .pred
-      ) |>
-      mutate(model_name = model_name)
   }
   
   ## Mesurer la performance sur les données de test ---------------------------
-  final_fit <- last_fit(
-    final_workflow,
-    split = data_split,
-    metrics = model_metrics
-  )
-  ## Obtenir les prédictions sur les données de test
-  min_quality <- min(data_train$quality)
-  max_quality <- max(data_train$quality)
-  test_predictions <- collect_predictions(final_fit) |>
-    mutate(
-      quality_class = factor(quality, levels = min_quality:max_quality),
-      .pred_class = factor(round(.pred), levels = min_quality:max_quality)
-    )
+  test_predictions <- augment(training_fit, new_data = data_test)
   
   ## Performance du modèle final
-  test_performance <- bind_rows(
-    model_metrics(
-      test_predictions,
-      truth = quality,
-      estimate = .pred
-    ),
-    suppressWarnings(metric_set(accuracy, f_meas)(
-      test_predictions,
-      truth = quality_class,
-      estimate = .pred_class,
-      estimator = "macro_weighted"
-    ))
-  ) |>
-    mutate(model_name = model_name)
+  test_performance <- calculate_metrics(test_predictions, model_name)
 
   list(
     model_tuning = model_tuning,
