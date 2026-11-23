@@ -80,5 +80,5 @@ list(knn_acp, knn, rf_acp, rf, null) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 
 ## Sélection du modèle final --------------------------------------------------
-plot_raw_preds(rf$test_predictions, "Modèle final Random Forest")
-plot_cm(rf$test_predictions, "Modèle final Random Forest")
+plot_raw_preds(rf$test_predictions)
+plot_cm(rf$test_predictions)

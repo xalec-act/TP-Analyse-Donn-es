@@ -3,7 +3,7 @@
 
 library(ggplot2)
 
-plot_raw_preds <- function(predictions, subtitle = NULL) {
+plot_raw_preds <- function(predictions) {
   
   quality_min <- min(predictions$quality, round(predictions$.pred))
   quality_max <- max(predictions$quality, round(predictions$.pred))
@@ -51,7 +51,7 @@ plot_raw_preds <- function(predictions, subtitle = NULL) {
     theme(panel.grid = element_blank())
 }
 
-plot_cm <- function(predictions, subtitle = NULL) {
+plot_cm <- function(predictions) {
   
   quality_min <- min(predictions$quality, round(predictions$.pred))
   quality_max <- max(predictions$quality, round(predictions$.pred))
@@ -69,7 +69,6 @@ plot_cm <- function(predictions, subtitle = NULL) {
     type = "heatmap"
   ) +
     labs(
-      title = paste(c("Matrice de confusion", subtitle), collapse = " : "),
       x = "Qualité prédite",
       y = "Qualité réelle",
       fill = "Nombre"

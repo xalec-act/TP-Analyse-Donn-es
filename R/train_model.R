@@ -128,12 +128,9 @@ train_model <- function(
     )
   } else if (engine == "rpartScore") {
     
-    min_quality <- min(data_train$quality)
-    max_quality <- max(data_train$quality)
-    
     model_rec <- model_rec |>
       step_mutate(
-        quality = ordered(quality, levels = min_quality:max_quality)
+        quality = ordered(quality, levels = min(.data$quality):max(.data$quality))
       )
     
     model_spec <- decision_tree(
@@ -156,7 +153,7 @@ train_model <- function(
       size = 2
     )
     
-    model_metrics <- metric_set(kap, f_meas, accuracy)
+    model_metrics <- metric_set(kap, accuracy, accuracy)
   }
   
   ## Créer le workflow
@@ -190,31 +187,21 @@ train_model <- function(
   training_predictions <- augment(training_fit, new_data = data_train)
   
   ## Mesurer la performance sur les données d'entraînement --------------------
-  if (engine == "rpartScore") {
-
-    # Mesures pour modèles avec variable ordinale
-    training_performance <- training_predictions |>
-      mutate(
-        quality_class = factor(quality, levels = min_quality:max_quality)
-      ) |>
-      model_metrics(
-        truth = quality_class,
-        estimate = .pred_class,
-        estimator = "macro_weighted"
-      ) |>
-      mutate(model_name = model_name)
-
-  } else {
-  
-    training_performance <- calculate_metrics(training_predictions, model_name)
-    
-  }
+  training_performance <- calculate_metrics(
+    training_predictions,
+    model_name,
+    is_ordinal = engine == "rpartScore"
+  )
   
   ## Mesurer la performance sur les données de test ---------------------------
   test_predictions <- augment(training_fit, new_data = data_test)
   
   ## Performance du modèle final
-  test_performance <- calculate_metrics(test_predictions, model_name)
+  test_performance <- calculate_metrics(
+    test_predictions,
+    model_name,
+    is_ordinal = engine == "rpartScore"
+  )
 
   list(
     model_tuning = model_tuning,
