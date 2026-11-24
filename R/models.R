@@ -6,6 +6,7 @@ source("R/plot_predictions.R")
 source("R/calculate_metrics.R")
 
 library(tidymodels)
+library(patchwork)
 
 ## Entraînement de modèles ----------------------------------------------------
 
@@ -79,6 +80,7 @@ list(knn_acp, knn, rf_acp, rf, null) |>
   select(!.estimator) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 
-## Sélection du modèle final --------------------------------------------------
-plot_raw_preds(rf$test_predictions)
+## Visualisation de la performance du modèle final ----------------------------
+plot_raw_preds(rf$training_predictions, "Jeu d'entraînement") +
+  plot_raw_preds(rf$test_predictions, "Jeu de test")
 plot_cm(rf$test_predictions)

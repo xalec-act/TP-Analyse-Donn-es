@@ -3,7 +3,7 @@
 
 library(ggplot2)
 
-plot_raw_preds <- function(predictions) {
+plot_raw_preds <- function(predictions, title = NULL) {
   
   quality_min <- min(predictions$quality, round(predictions$.pred))
   quality_max <- max(predictions$quality, round(predictions$.pred))
@@ -46,9 +46,16 @@ plot_raw_preds <- function(predictions) {
       expand = c(0, 0)
     ) +
     coord_fixed() +
-    labs(x = "Qualité réelle", y = "Qualité prédite") +
+    labs(
+      title = title,
+      x = "Qualité observée",
+      y = "Qualité prédite"
+    ) +
     theme_minimal() +
-    theme(panel.grid = element_blank())
+    theme(
+      panel.grid = element_blank(),
+      plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "pt")
+    )
 }
 
 plot_cm <- function(predictions) {
@@ -70,9 +77,25 @@ plot_cm <- function(predictions) {
   ) +
     labs(
       x = "Qualité prédite",
-      y = "Qualité réelle",
+      y = "Qualité observée",
       fill = "Nombre"
     ) +
     theme_minimal() +
     theme(panel.grid = element_blank())
+}
+
+plot_importance <- function(model_wf) {
+  model_fit <- extract_fit_engine(model_wf)
+  data.frame(
+    Variable = names(importance(model_fit)),
+    Importance = importance(model_fit)
+  ) |>
+  ggplot(aes(reorder(Variable, Importance), Importance)) +
+    geom_col(fill = "steelblue") +
+    coord_flip() +
+    labs(
+      x = "Variable prédictive",
+      y = "Importance d'impureté"
+    ) +
+    theme_classic()
 }

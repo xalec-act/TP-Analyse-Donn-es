@@ -50,11 +50,7 @@ train_model <- function(
       step_normalize(all_numeric_predictors())
   }
   
-  model_metrics <- metric_set(
-    mae,
-    rmse,
-    rsq
-  )
+  model_metrics <- metric_set(mae, rmse, rsq)
   
   if (engine == "kknn") {
     
@@ -153,7 +149,7 @@ train_model <- function(
       size = 2
     )
     
-    model_metrics <- metric_set(kap, accuracy, accuracy)
+    model_metrics <- metric_set(kap, bal_accuracy, f_meas)
   }
   
   ## Créer le workflow

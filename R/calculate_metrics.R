@@ -13,7 +13,7 @@ calculate_metrics <- function(
       mutate(
         quality_class = factor(quality, levels = min(.data$quality):max(.data$quality))
       ) |>
-      metric_set(kap, accuracy, f_meas)(
+      metric_set(kap, bal_accuracy, f_meas)(
         truth = quality_class,
         estimate = .pred_class,
         estimator = "macro_weighted"
@@ -27,7 +27,7 @@ calculate_metrics <- function(
         truth = quality,
         estimate = .pred
       )),
-      suppressWarnings(metric_set(accuracy, f_meas)(
+      suppressWarnings(metric_set(bal_accuracy, f_meas)(
         prediction_data |>
           mutate(
             quality_class = factor(quality, levels = 0:10),
