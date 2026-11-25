@@ -3,7 +3,26 @@
 
 library(ggplot2)
 
-plot_raw_preds <- function(predictions, title = NULL) {
+plot_quality_distribution <- function(data) {
+  data |>
+    mutate(quality_class = factor(quality)) |>
+    count(quality_class) |>
+    ggplot(aes(quality_class, n)) +
+    geom_col(stat = "identity", fill = "#eb6469") +
+    geom_text(aes(label = n), vjust = -0.5) +
+    labs(x = "Qualité observée", y = "Nombre") +
+    theme_classic() +
+    theme(legend.position = "none") +
+    scale_y_continuous(expand = c(0, 0, 0.1, 0))
+}
+
+plot_raw_preds <- function(
+    predictions,
+    title = NULL,
+    y_axis_pos = "left",
+    x_lab = "Qualité observée",
+    y_lab = "Qualité prédite"
+  ) {
   
   quality_min <- min(predictions$quality, round(predictions$.pred))
   quality_max <- max(predictions$quality, round(predictions$.pred))
@@ -22,7 +41,7 @@ plot_raw_preds <- function(predictions, title = NULL) {
       inherit.aes = FALSE
     ) +
     scale_fill_manual(
-      values = c("FALSE" = "white", "TRUE" = "coral1"),
+      values = c("FALSE" = "white", "TRUE" = "#eb6469"),
       guide = "none"
     ) +
     geom_jitter(
@@ -41,21 +60,14 @@ plot_raw_preds <- function(predictions, title = NULL) {
       expand = c(0, 0)
     ) +
     scale_y_continuous(
+      position = y_axis_pos,
       breaks = quality_min:quality_max,
       limits = c(quality_min - 0.5, quality_max + 0.5),
       expand = c(0, 0)
     ) +
     coord_fixed() +
-    labs(
-      title = title,
-      x = "Qualité observée",
-      y = "Qualité prédite"
-    ) +
-    theme_minimal() +
-    theme(
-      panel.grid = element_blank(),
-      plot.margin = margin(t = 0, r = 0, b = 0, l = 0, unit = "pt")
-    )
+    labs(title = title, x = x_lab, y = y_lab) +
+    theme_classic()
 }
 
 plot_cm <- function(predictions) {
@@ -91,7 +103,7 @@ plot_importance <- function(model_wf) {
     Importance = importance(model_fit)
   ) |>
   ggplot(aes(reorder(Variable, Importance), Importance)) +
-    geom_col(fill = "steelblue") +
+    geom_col(fill = "#eb6469") +
     coord_flip() +
     labs(
       x = "Variable prédictive",

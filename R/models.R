@@ -10,15 +10,7 @@ library(patchwork)
 
 ## Entraînement de modèles ----------------------------------------------------
 
-# KNN avec ACP
-knn_acp <- train_model(
-  data_train = white_acp_train,
-  data_test = white_acp_test,
-  engine = "kknn",
-  model_name = "KNN + ACP"
-)
-
-# KNN sans ACP
+# KNN
 knn <- train_model(
   data_train = white_train,
   data_test = white_test,
@@ -27,15 +19,7 @@ knn <- train_model(
   normalize = TRUE
 )
 
-# Random Forest avec ACP
-rf_acp <- train_model(
-  data_train = white_acp_train,
-  data_test = white_acp_test,
-  "ranger",
-  model_name = "RF + ACP"
-)
-
-# Random Forest sans ACP
+# Random Forest
 rf <- train_model(
   data_train = white_train,
   data_test = white_test,
@@ -66,21 +50,44 @@ null <- list(
 
 ## Comparaison des modèles ----------------------------------------------------
 
+## Hyperparamètres
+list(knn, rf) |>
+  map(function(model) {
+    select_best(model$model_tuning, metric = "mae") |>
+        select(!.config)
+  }) |>
+  bind_rows()
+
 ## Performance d'entraînement
-list(knn_acp, knn, rf_acp, rf, null) |>
+list(knn, rf, null) |>
   map(\(model) model$training_performance) |>
   bind_rows() |>
   select(!.estimator) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 
 ## Performance de test
-list(knn_acp, knn, rf_acp, rf, null) |>
+list(knn, rf, null) |>
   map(\(model) model$test_performance) |>
   bind_rows() |>
   select(!.estimator) |>
   pivot_wider(names_from = .metric, values_from = .estimate)
 
 ## Visualisation de la performance du modèle final ----------------------------
-plot_raw_preds(rf$training_predictions, "Jeu d'entraînement") +
-  plot_raw_preds(rf$test_predictions, "Jeu de test")
+
+p1 <- plot_raw_preds(rf$training_predictions, "Jeu d'entraînement")
+p2 <- plot_raw_preds(
+  rf$test_predictions,
+  "Jeu de test",
+  y_axis_pos = "right",
+  y_lab = NULL
+)
+wrap_elements((p1 | p2) & xlab(NULL)) +
+  labs(tag = "Qualité observée") +
+  theme(
+    plot.tag = element_text(size = rel(1)),
+    plot.tag.position = "bottom"
+  )
+
 plot_cm(rf$test_predictions)
+
+plot_importance(rf$training_fit)

@@ -58,15 +58,33 @@ diagnostics_acp_normee <- function(z, acp) {
   )
 }
 
-tracer_cercle <- function(rho, etiquettes, positions, titre = NULL) {
+tracer_cercle <- function(
+    correlations,
+    cp_i,
+    cp_j,
+    show_n = nrow(correlations),
+    positions = NULL,
+    titre = NULL
+) {
+  
+  rho <- correlations[, paste0("PC", c(cp_i, cp_j))]
+  arrow_angles <- atan2(correlations[, cp_j], correlations[, cp_i])
+  ix <- order(rowSums(rho^2), decreasing = TRUE)[1:show_n]
+  positions <- positions %||%
+    matrix(1.3 * c(cos(arrow_angles[ix]), sin(arrow_angles[ix])), ncol = 2)
+  etiquettes <- rownames(rho[ix, ])
+  
+    
   theta <- seq(0, 2 * pi, length.out = 361)
   plot(
     cos(theta), sin(theta), type = "l", asp = 1, col = "#60747d",
     xlim = c(-1.4, 1.4), ylim = c(-1.4, 1.4),
-    xlab = "Corrélation avec CP1", ylab = "Corrélation avec CP2", main = titre
+    xlab = paste0("Corrélation avec CP", cp_i),
+    ylab = paste0("Corrélation avec CP", cp_j),
+    main = titre
   )
   abline(h = 0, v = 0, col = "#c4d2d6")
-  arrows(0, 0, rho[, 1], rho[, 2], length = 0.09, col = "#00897b", lwd = 2)
-  segments(rho[, 1], rho[, 2], positions[, 1], positions[, 2], col = "#aab7bb")
-  text(positions, labels = etiquettes, cex = 0.9)
+  arrows(0, 0, rho[, 1], rho[, 2], length = 0.09, col = "#eb6469", lwd = 2)
+  segments(rho[ix, 1], rho[ix, 2], positions[, 1], positions[, 2], col = "#aab7bb")
+  text(positions[, 1], positions[, 2], labels = etiquettes, cex = 0.9)
 }
