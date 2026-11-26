@@ -67,7 +67,7 @@ train_model <- function(
     
     param_grid <- crossing(
       neighbors = 1:50,
-      weight_func = c("optimal", "triangular", "rectangular")
+      weight_func = c("optimal", "triangular", "rectangular", "epanechnikov")
     )
     
   } else if (engine == "ranger") {
