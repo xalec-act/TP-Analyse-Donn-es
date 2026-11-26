@@ -80,7 +80,7 @@ train_model <- function(
     ) |>
       set_engine(
         "ranger",
-        importance = "impurity",
+        importance = "permutation",
         num.threads = parallel::detectCores()
       )
     

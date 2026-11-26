@@ -3,8 +3,6 @@
 
 source("data-raw/import_data.R")
 
-choix_acp_white <- 7
-
 if (!all(file.exists("data/white_acp_train.csv", "data/white_acp_test.csv"))) {
   
   num_train <- as.matrix(white_train[, -which(colnames(white_train) == "quality")])
@@ -14,11 +12,11 @@ if (!all(file.exists("data/white_acp_train.csv", "data/white_acp_test.csv"))) {
     center = TRUE
   )
   white_acp_train <- data.frame(
-    predict(acp, newdata = white_train)[, 1:choix_acp_white],
+    predict(acp, newdata = white_train),
     quality = white_train$quality
   )
   white_acp_test <- data.frame(
-    predict(acp, newdata = white_test)[, 1:choix_acp_white],
+    predict(acp, newdata = white_test),
     quality = white_test$quality
   )
   
@@ -28,20 +26,8 @@ if (!all(file.exists("data/white_acp_train.csv", "data/white_acp_test.csv"))) {
 } else {
   
   white_acp_train <- read.csv("data/white_acp_train.csv")
-  stopifnot(
-    all.equal(
-      colnames(white_acp_train),
-      c(paste0("PC", 1:choix_acp_white), "quality")
-    )
-  )
   white_acp_train$quality <- as.numeric(white_acp_train$quality)
   
   white_acp_test <- read.csv("data/white_acp_test.csv")
-  stopifnot(
-    all.equal(
-      colnames(white_acp_test),
-      c(paste0("PC", 1:choix_acp_white), "quality")
-    )
-  )
   white_acp_test$quality <- as.numeric(white_acp_test$quality)
 }

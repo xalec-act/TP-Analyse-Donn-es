@@ -105,9 +105,6 @@ plot_importance <- function(model_wf) {
   ggplot(aes(reorder(Variable, Importance), Importance)) +
     geom_col(fill = "#eb6469") +
     coord_flip() +
-    labs(
-      x = "Variable prédictive",
-      y = "Importance d'impureté"
-    ) +
+    labs(x = "Variable prédictive", y = "Importance de permutation") +
     theme_classic()
 }

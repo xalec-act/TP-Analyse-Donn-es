@@ -91,3 +91,21 @@ wrap_elements((p1 | p2) & xlab(NULL)) +
 plot_cm(rf$test_predictions)
 
 plot_importance(rf$training_fit)
+
+# Comparaison de l'importance des variables avec ACP --------------------------
+
+rf_acp <- train_model(
+  data_train = white_acp_train,
+  data_test = white_acp_test,
+  "ranger",
+  model_name = "RF_ACP"
+)
+
+pi1 <- plot_importance(rf$training_fit)
+pi2 <- plot_importance(rf_acp$training_fit)
+wrap_elements((pi1 | pi2) & ylab(NULL) & xlab(NULL)) +
+  labs(tag = "Importance de permutation") +
+  theme(
+    plot.tag = element_text(size = rel(1)),
+    plot.tag.position = "bottom"
+  )
