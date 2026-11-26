@@ -1,3 +1,4 @@
 data/*.csv
 .Rhistory
 .DS_Store
+*.pdf
