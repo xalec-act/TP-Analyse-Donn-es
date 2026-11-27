@@ -101,8 +101,8 @@ rf_acp <- train_model(
   model_name = "RF_ACP"
 )
 
-pi1 <- plot_importance(rf$training_fit)
-pi2 <- plot_importance(rf_acp$training_fit)
+pi1 <- plot_importance(rf$training_fit, "Variables originales")
+pi2 <- plot_importance(rf_acp$training_fit, "Composantes principales")
 wrap_elements((pi1 | pi2) & ylab(NULL) & xlab(NULL)) +
   labs(tag = "Importance de permutation") +
   theme(

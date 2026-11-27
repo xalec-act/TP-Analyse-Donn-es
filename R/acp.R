@@ -91,3 +91,7 @@ data.frame(
   Variable = names(cos2_acp),
   cos2 = unname(cos2_acp)
 )
+
+# Corrélation de spearman des variables avec quality
+sp <- cor(white_train, method = "spearman")[, 12]
+round(sp[order(abs(sp), decreasing = TRUE)][-1], 3)

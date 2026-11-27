@@ -96,7 +96,7 @@ plot_cm <- function(predictions) {
     theme(panel.grid = element_blank())
 }
 
-plot_importance <- function(model_wf) {
+plot_importance <- function(model_wf, title = NULL) {
   model_fit <- extract_fit_engine(model_wf)
   data.frame(
     Variable = names(importance(model_fit)),
@@ -105,6 +105,10 @@ plot_importance <- function(model_wf) {
   ggplot(aes(reorder(Variable, Importance), Importance)) +
     geom_col(fill = "#eb6469") +
     coord_flip() +
-    labs(x = "Variable prédictive", y = "Importance de permutation") +
+    labs(
+      title = title,
+      x = "Variable prédictive",
+      y = "Importance de permutation"
+    ) +
     theme_classic()
 }
